@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Windows 控制台默认 GBK：确保测试环境 UTF-8，验证脚本自修复逻辑
+      - name: Set UTF-8 (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "PYTHONIOENCODING=utf-8" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        run: |
+          python tests/test_garbled.py
+          python tests/test_hook.py
+          python tests/test_cli.py
+
+      - name: Verify CLI demo (smoke)
+        run: |
+          python scripts/garbled_fix.py --demo --json > /tmp/demo.json
+          python -c "import json; d=json.load(open('/tmp/demo.json')); assert len(d)==11, d; print('demo OK:', len(d), 'types')"
+
+      - name: Verify --check exit code
+        run: |
+          python -c "
+          import subprocess, sys
+          bad = '好好学习天天向上'.encode('utf-8').decode('latin-1')
+          open('/tmp/bad.txt', 'w', encoding='utf-8').write(bad)
+          open('/tmp/good.txt', 'w', encoding='utf-8').write('正常文本')
+          for f, want in (('/tmp/bad.txt', 1), ('/tmp/good.txt', 0)):
+              r = subprocess.run([sys.executable, 'scripts/garbled_fix.py', '--check', '-f', f])
+              assert r.returncode == want, (f, r.returncode)
+          print('--check exit codes OK')
+          "

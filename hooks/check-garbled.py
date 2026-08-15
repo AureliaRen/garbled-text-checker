@@ -3,7 +3,7 @@
 """PostToolUse hook: 检测工具输出中的编码报错/乱码特征，命中时注入提醒让 Claude 调用 garbled-text-checker skill。
 
 用法: 在 settings.json 的 PostToolUse hooks (matcher: Bash|Read) 中配置:
-    python "C:\\Users\\任泽鑫\\.claude\\hooks\\check-garbled.py"
+    python "~/.claude/hooks/check-garbled.py"
 stdin 接收 hook 输入 JSON，命中时 stdout 输出带 additionalContext 的 JSON。
 """
 import json
@@ -84,10 +84,9 @@ def main():
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
             "additionalContext": (
-                f"[乱码检测] 工具输出疑似{kind}。请调用 garbled-text-checker skill "
-                "（C:\\Users\\任泽鑫\\.claude\\skills\\garbled-text-checker\\SKILL.md）"
-                "：先判定乱码类型，再用其内嵌脚本反向还原；若是编码报错，先修正编码设置，"
-                "再按该 skill 的预防规则避免复发。"
+                f"[乱码检测] 工具输出疑似{kind}。请调用 garbled-text-checker skill："
+                "先判定乱码类型，再用 scripts/garbled_fix.py（或 SKILL.md 内嵌脚本）反向还原；"
+                "若是编码报错，先修正编码设置，再按该 skill 的预防规则避免复发。"
             ),
         }
     }

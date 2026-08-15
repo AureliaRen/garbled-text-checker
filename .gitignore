@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 测试临时文件
+tests/_tmp_*.txt
+tests/_debug_*.py
+
+# 环境/密钥
+.env
+*.key
+*.pem
+
+# 编辑器
+.idea/
+.vscode/

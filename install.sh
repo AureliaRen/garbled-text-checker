@@ -10,19 +10,24 @@ SKILLS_DIR="$HOME/.claude/skills/garbled-text-checker"
 HOOKS_DIR="$HOME/.claude/hooks"
 SETTINGS="$HOME/.claude/settings.json"
 
-mkdir -p "$SKILLS_DIR" "$HOOKS_DIR"
+mkdir -p "$SKILLS_DIR/scripts" "$HOOKS_DIR"
 
 echo "==> 复制 SKILL.md"
 cp "$PROJ/SKILL.md" "$SKILLS_DIR/SKILL.md"
+
+echo "==> 复制 scripts/（完整版 CLI）"
+cp "$PROJ/scripts/garbled_fix.py" "$SKILLS_DIR/scripts/garbled_fix.py"
 
 echo "==> 复制 hook 脚本"
 cp "$PROJ/hooks/check-garbled.py" "$HOOKS_DIR/check-garbled.py"
 
 echo "==> 合并 settings.json hooks 配置"
 python -X utf8 - "$SETTINGS" <<'PY'
-import json, sys
+import json, os, sys
 
 path = sys.argv[1]
+# 用户主目录（Windows 形式，JSON 中反斜杠需转义）
+home_win = os.path.expanduser("~").replace("\\", "\\\\")
 with open(path, encoding="utf-8") as f:
     cfg = json.load(f)
 
@@ -31,7 +36,7 @@ entry = {
     "hooks": [{
         "type": "command",
         "shell": "bash",
-        "command": "python -X utf8 \"C:\\Users\\任泽鑫\\.claude\\hooks\\check-garbled.py\"",
+        "command": 'python -X utf8 "' + home_win + r"\.claude\hooks\check-garbled.py" + '"',
         "timeout": 15,
         "statusMessage": "检测编码乱码...",
     }],
