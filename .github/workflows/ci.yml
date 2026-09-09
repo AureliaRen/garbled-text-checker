@@ -35,20 +35,33 @@ jobs:
           python tests/test_hook.py
           python tests/test_cli.py
 
+      # shell: python + tempfile：/tmp 是 POSIX 路径，Windows runner 上不存在
       - name: Verify CLI demo (smoke)
+        shell: python
         run: |
-          python scripts/garbled_fix.py --demo --json > /tmp/demo.json
-          python -c "import json; d=json.load(open('/tmp/demo.json')); assert len(d)==11, d; print('demo OK:', len(d), 'types')"
+          import json, os, subprocess, sys, tempfile
+          out = os.path.join(tempfile.gettempdir(), "demo.json")
+          with open(out, "w", encoding="utf-8") as f:
+              subprocess.run([sys.executable, "scripts/garbled_fix.py", "--demo", "--json"],
+                             stdout=f, check=True)
+          with open(out, encoding="utf-8") as f:
+              d = json.load(f)
+          assert len(d) == 11, d
+          print("demo OK:", len(d), "types")
 
       - name: Verify --check exit code
+        shell: python
         run: |
-          python -c "
-          import subprocess, sys
+          import os, subprocess, sys, tempfile
+          tmp = tempfile.gettempdir()
+          bad_p = os.path.join(tmp, "bad.txt")
+          good_p = os.path.join(tmp, "good.txt")
           bad = '好好学习天天向上'.encode('utf-8').decode('latin-1')
-          open('/tmp/bad.txt', 'w', encoding='utf-8').write(bad)
-          open('/tmp/good.txt', 'w', encoding='utf-8').write('正常文本')
-          for f, want in (('/tmp/bad.txt', 1), ('/tmp/good.txt', 0)):
-              r = subprocess.run([sys.executable, 'scripts/garbled_fix.py', '--check', '-f', f])
+          with open(bad_p, "w", encoding="utf-8") as f:
+              f.write(bad)
+          with open(good_p, "w", encoding="utf-8") as f:
+              f.write("正常文本")
+          for f, want in ((bad_p, 1), (good_p, 0)):
+              r = subprocess.run([sys.executable, "scripts/garbled_fix.py", "--check", "-f", f])
               assert r.returncode == want, (f, r.returncode)
-          print('--check exit codes OK')
-          "
+          print("--check exit codes OK")

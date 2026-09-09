@@ -8,6 +8,9 @@
 - install.sh 同步部署便携版；hook 提示文案与 README 用法同步更新
 - 回归测试改为直接加载 `scripts/garbled_portable.py`（不再从 SKILL.md 提取）
 
+### Fixed
+- CI 冒烟步骤在 Windows runner 上失败：`/tmp` 为 POSIX 路径，改用 `shell: python` + `tempfile.gettempdir()` 跨平台兼容（自 v1.1.0 起即存在）
+
 ## [1.1.0] - 2026-08-15
 
 ### Added
