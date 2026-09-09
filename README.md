@@ -8,7 +8,7 @@ Identify and repair garbled text caused by encoding errors: the 6 classic Chines
 
 ## Features 功能
 
-- **11 种乱码类型检测** (11 mojibake type detection)
+- **12 种乱码类型检测**（含隐形码：不可见 Unicode）(12 type detection incl. invisible unicode)
 
   | Classic 经典 | Cause 成因 |
   |---|---|
@@ -41,7 +41,7 @@ python scripts/garbled_fix.py "鑿辨浚瑕佸ソ濼濂藉彛涔犱範"    # 直
 python scripts/garbled_fix.py -f 乱码.txt -f 另一份.csv      # 多文件
 python scripts/garbled_fix.py -d data/ -r --check            # 递归扫描 + 仅检测（有乱码 exit 1）
 python scripts/garbled_fix.py -f 乱码.txt --json             # JSON 输出
-python scripts/garbled_fix.py --demo                         # 生成 11 种类型演示样本
+python scripts/garbled_fix.py --demo                         # 生成 12 种类型演示样本
 ```
 
 Portable single-file script (`scripts/garbled_portable.py`, six classic types; the argument is a file path, text can be piped in):
@@ -82,7 +82,7 @@ CI (GitHub Actions) runs all tests on Ubuntu / Windows / macOS.
 
 ## Roadmap 路线图
 
-- [x] 11 种类型检测与修复
+- [x] 12 种类型检测与修复（含隐形码）
 - [x] 完整 CLI（批量/JSON/退出码）
 - [x] Claude Code skill + hook
 - [ ] ftfy 风格的高级修复（lone marks、ligatures、crashed "s"）

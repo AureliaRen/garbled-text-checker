@@ -3,8 +3,10 @@
 """garbled_fix — 乱码检测与修复 CLI（garbled-text-checker skill 的完整实现）
 
 识别并修复文本乱码（编码错误）：六种经典类型（古文码 / 口字码 / 符号码 /
-拼音码 / 问句码 / 锟拷码）+ 五种扩展类型（HTML 双重转义 / 孤立代理项 /
-cp1252 误读 / UTF-16 误读 / C1 控制符）。
+拼音码 / 问句码 / 锟拷码）+ 六种扩展类型（HTML 双重转义 / 孤立代理项 /
+cp1252 误读 / UTF-16 误读 / C1 控制符 / 隐形码）。
+隐形码不是编码错误而是不可见 Unicode（零宽符 / bidi 控制 / tag 字符 /
+变体选择符，AI 水印与隐形注入的常见载体），修复动作是剥离而非反向还原。
 
 用法:
   garbled_fix.py "鑿辨浚瑕佸ソ濼濂藉彛涔犱範"    # 直接传乱码文本
@@ -30,7 +32,7 @@ import re
 import sys
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.3.0"
 
 # ============================================================
 # 检测
@@ -40,6 +42,17 @@ __version__ = "1.1.0"
 KANA_CJK = re.compile(r"[぀-ヿ︰-﹏]")
 # cp1252 误读 UTF-8 的典型序列：UTF-8 双字节（C2/C3 开头）按 cp1252 读
 CP1252_PAT = re.compile(r"â[€œš™¤¢¦]|Ã[©«¯°©±ª]|Â[£¥§¨°±²]")
+
+# 隐形码预过滤（C 速度正则先扫一遍，clean 文本直接短路，避免逐字符循环拖慢 BFS）
+INV_PREFILTER = re.compile(
+    r"[\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff"
+    r"[\ufe00-\ufe0f\U000e0000-\U000e007f\U000e0100-\U000e01ef]"
+)
+# emoji 疑似基字符：ZWJ 序列与 VS16 表现层（红心+VS16 之类）的语境判断用；
+# U+2100-U+2BFF 已覆盖箭头/杂项符号/杂锦符号，另补 (C)(R)(TM)
+EMOJIISH = re.compile(
+    r"[\u2100-\u2bff\U0001f000-\U0001faff\u00a9\u00ae\u2122]"
+)
 
 TYPE_NAMES = {
     "mojibake-guwen": "古文码（GBK 误读 UTF-8）",
@@ -53,6 +66,7 @@ TYPE_NAMES = {
     "cp1252-misread": "cp1252码（Windows-1252 误读 UTF-8）",
     "utf16-misread": "UTF16码（UTF-16 误读）",
     "c1-control": "控制码（C1 控制符密集）",
+    "invisible": "隐形码（不可见 Unicode：零宽/bidi/tag/变体选择符）",
 }
 
 
@@ -61,6 +75,56 @@ def _ratio(s: str, pattern: str) -> float:
     if not s:
         return 0.0
     return len(re.findall(pattern, s)) / len(s)
+
+
+def _emojiish(c: str) -> bool:
+    """是否 emoji 疑似基字符（ZWJ/VS 的语境判断）"""
+    return bool(c) and bool(EMOJIISH.match(c))
+
+
+def _iter_invisible(s: str):
+    """产出 (索引, 类别)：可行动的隐形字符位置。
+
+    不计（正常文本合法出现）：文件头 BOM（U+FEFF 首位）、emoji 语境的
+    ZWJ（\u200d 夹在 emoji 基字符之间）与 VS16（如 \u2764\ufe0f）、
+    游离 <3 个的变体选择符（排版噪音）。
+    """
+    for i, c in enumerate(s):
+        if c in "\u200b\u200c\u2060\u180e":
+            yield i, "零宽"
+        elif c == "\ufeff":
+            if i > 0:
+                yield i, "零宽"  # 文件头 BOM 除外
+        elif c == "\u200d":
+            prev = s[i - 1] if i else ""
+            nxt = s[i + 1] if i + 1 < len(s) else ""
+            if not (_emojiish(prev) or _emojiish(nxt)):
+                yield i, "零宽"
+        elif "\U000e0000" <= c <= "\U000e007f":
+            yield i, "tag"
+        elif "\U000e0100" <= c <= "\U000e01ef":
+            yield i, "变体选择符"
+        elif ("\u202a" <= c <= "\u202e" or "\u2066" <= c <= "\u2069"
+              or c in "\u200e\u200f\u2061\u2062\u2063\u2064"):
+            yield i, "bidi/运算符"
+        elif "\ufe00" <= c <= "\ufe0f":
+            prev = s[i - 1] if i else ""
+            if not _emojiish(prev):
+                yield i, "变体选择符(游离)"
+
+
+def invisible_inventory(s: str) -> dict[str, int]:
+    """按类别统计可行动的隐形字符；空 dict = 无隐形码"""
+    if not s or not INV_PREFILTER.search(s):
+        return {}
+    inv: dict[str, int] = {}
+    for _, cat in _iter_invisible(s):
+        inv[cat] = inv.get(cat, 0) + 1
+    # 游离变体选择符（非 emoji 语境的 VS1-16）<3 个视为表现层噪音；
+    # 成批出现才是 VS 隐写/注水的特征
+    if inv.get("变体选择符(游离)", 0) < 3:
+        inv.pop("变体选择符(游离)", None)
+    return inv
 
 
 def detect(s: str) -> str | None:
@@ -72,6 +136,8 @@ def detect(s: str) -> str | None:
         return "html-double-escape"
     if re.search(r"[\ud800-\udfff]", s):
         return "lone-surrogate"
+    if invisible_inventory(s):
+        return "invisible"
     # —— 经典类型 ——
     if "锟斤拷" in s or (s.count("拷") >= 3 and "锟" in s):
         return "mojibake-kunkao"
@@ -174,6 +240,8 @@ def fix(s: str) -> str | None:
     if r:
         return r
     kind = detect(s)
+    if kind == "invisible":
+        return fix_invisible(s)
     if kind in ("c1-control", "mojibake-kunkao"):
         # c1-control：GBK 字节流的单字节残留，需与相邻字节重新配对（字节重组问题），
         # 单文本 BFS 链无法可靠还原。
@@ -218,6 +286,15 @@ def fix(s: str) -> str | None:
     return best[1] if best else None
 
 
+def fix_invisible(s: str) -> str:
+    """隐形码修复：剥离可行动的不可见字符（不是编码错误，剥离即还原）"""
+    inv = invisible_inventory(s)
+    drop = {i for i, cat in _iter_invisible(s) if cat in inv}
+    label = "+".join(f"{cat}x{n}" for cat, n in inv.items())
+    cleaned = "".join(c for i, c in enumerate(s) if i not in drop)
+    return f"strip-invisible({label}): {cleaned}"
+
+
 # ============================================================
 # 演示样本
 # ============================================================
@@ -242,6 +319,7 @@ def demo_samples() -> dict[str, str]:
         # 混合文本（ASCII+中文）的 UTF-16LE 误读：ASCII 的 LE 字节含 NUL（\x00）特征
         "utf16-misread": "abc 学习编程".encode("utf-16-le").decode("latin-1"),
         "c1-control": "\u0080\u0081\u0082\u0083\u0090中文",        # C1 控制符密集
+        "invisible": "隐藏\u200b的\u2060标记\u202e与\U000e0041注入",
     }
 
 
@@ -287,7 +365,7 @@ def main(argv=None) -> int:
             pass
     ap = argparse.ArgumentParser(
         prog="garbled_fix",
-        description="乱码检测与修复：六种经典乱码 + 五种扩展类型。"
+        description="乱码检测与修复：六种经典乱码 + 六种扩展类型（含隐形码）。"
                     "detect 判定类型，fix BFS 多轮反向还原。",
         epilog="示例: garbled_fix.py -f 乱码.txt --json | garbled_fix.py --demo",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -318,7 +396,7 @@ def main(argv=None) -> int:
         else:
             for r in results:
                 fix_out = r["fix"]
-                if isinstance(fix_out, str) and "→" in fix_out:
+                if isinstance(fix_out, str) and ": " in fix_out:
                     fix_out = fix_out.split(": ", 1)[1]
                 print(f"[{r['name']}] 判定={r['detected']} | 修复={fix_out}")
         return 0
@@ -344,7 +422,7 @@ def main(argv=None) -> int:
             status = "✓ 正常" if not r["detected"] else f"乱码: {TYPE_NAMES.get(r['detected'], r['detected'])}"
             print(f"{r['name']}: {status}")
             if r["fix"]:
-                fixed = r["fix"].split(": ", 1)[1] if "→" in r["fix"] else r["fix"]
+                fixed = r["fix"].split(": ", 1)[1] if ": " in r["fix"] else r["fix"]
                 print(f"   修复 ({r['fix'].split(': ', 1)[0]}): {fixed}")
             elif r["detected"]:
                 print("   无法自动还原（可能已丢失信息，如 U+FFFD 替换符）→ 回源头重新读取")

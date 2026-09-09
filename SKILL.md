@@ -1,6 +1,6 @@
 ---
 name: garbled-text-checker
-description: "检测与修复文本乱码。触发信号：报错 UnicodeEncodeError/UnicodeDecodeError/'gbk' codec can't/invalid start byte/illegal multibyte sequence，或文本出现锟斤拷、方块�、çæèå 类重音字母、ÓÉÔÂ 类声调字母、鑿辨浚类古文乱码、末尾异常问号。六种经典中文乱码+五种扩展类型，BFS 反向还原，给出成因与预防规则。"
+description: "检测与修复文本乱码。触发信号：报错 UnicodeEncodeError/UnicodeDecodeError/'gbk' codec can't/invalid start byte/illegal multibyte sequence，或文本出现锟斤拷、方块�、çæèå 类重音字母、ÓÉÔÂ 类声调字母、鑿辨浚类古文乱码、末尾异常问号、可疑的隐形字符。六种经典中文乱码+六种扩展类型（含隐形码：零宽/bidi/tag/变体选择符等不可见 Unicode，AI 水印与隐形注入常用载体），BFS 反向还原或剥离，给出成因与预防规则。"
 ---
 
 # 乱码检测与修复（Garbled Text Checker）
@@ -27,6 +27,7 @@ description: "检测与修复文本乱码。触发信号：报错 UnicodeEncodeE
 | **cp1252码** | `â€™` `â€œ` 等 Windows 字符 | Windows-1252 误读 UTF-8 | `s.encode('cp1252').decode('utf-8')` |
 | **UTF16码** | 含 NUL 或全角字符密集 | UTF-16 字节被 latin-1/UTF-8 误读 | `fix()` BFS（utf-16-le/be 已入链） |
 | **控制码** | C1 控制符（U+0080-009F）密集 | GBK 字节流的单字节残留 | 需字节重组，单文本不可还原 |
+| **隐形码** | 肉眼不可见：零宽符（U+200B/200C/2060）、bidi 控制（U+202A-E/2066-9）、tag 字符（U+E0000-E007F）、成批游离变体选择符 | AI 输出注水、隐形提示注入、网页复制的常见载体 | 完整版 CLI `fix()` 直接剥离出干净文本；文件头 BOM、emoji ZWJ 序列、emoji 后 VS16 属正常不报 |
 
 ## 检测与修复（直接运行脚本，勿读脚本源码）
 
