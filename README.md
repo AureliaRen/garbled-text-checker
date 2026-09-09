@@ -1,10 +1,10 @@
 # Garbled Text Checker 乱码检测与修复
 
-> Detect and fix garbled text (mojibake) — 11 encoding-error types, BFS reverse-decoding repair, and a Claude Code skill + auto-detection hook.
+> Detect and fix garbled text (mojibake) — 12 garbled-text types, BFS reverse-decoding repair, and a Claude Code skill + auto-detection hook.
 
 [![CI](https://github.com/AureliaRen/garbled-text-checker/actions/workflows/ci.yml/badge.svg)](https://github.com/AureliaRen/garbled-text-checker/actions/workflows/ci.yml)
 
-Identify and repair garbled text caused by encoding errors: the 6 classic Chinese mojibake types (**古文码 / 口字码 / 符号码 / 拼音码 / 问句码 / 锟拷码**) plus 5 extended types (HTML double-escape / lone surrogates / cp1252 misread / UTF-16 misread / C1 control characters). Ships as a standalone CLI, a portable embedded script, and a Claude Code skill with an automatic PostToolUse hook.
+Identify and repair garbled text caused by encoding errors: the 6 classic Chinese mojibake types (**古文码 / 口字码 / 符号码 / 拼音码 / 问句码 / 锟拷码**) plus 6 extended types (HTML double-escape / lone surrogates / cp1252 misread / UTF-16 misread / C1 control characters / invisible Unicode). Ships as a standalone CLI, a portable script, and a Claude Code skill with an automatic PostToolUse hook.
 
 ## Features 功能
 
@@ -69,12 +69,18 @@ This copies `SKILL.md` + the `scripts/` files (full CLI + portable) into `~/.cla
 - `fix(s)` — BFS over `enc × dec` combinations, depth 4. Early-exits on provably unrecoverable input: U+FFFD (bytes lost), 锟拷码 (came from an EF BF BD replacement stream), C1 control chars (byte-pairing problem). Han-dense input demands Han candidates — encoding chains never turn Chinese into pure latin text.
 - 诚实报告：不可还原时明确说"回源头重新读取"，绝不伪造还原结果。
 
+## Design Notes 设计取舍
+
+- **SKILL.md 不内嵌脚本** — 脚本内容不进模型上下文，模型只读运行输出。便携版独立为 `scripts/garbled_portable.py` 后，skill 触发时的加载体积约 -60%。
+- **隐形码防误报三规则** — 文件头 BOM、emoji ZWJ 序列（👨‍👩‍👦）、emoji 后的 VS16（❤️）都是正常文本，不判；游离变体选择符 <3 个视为排版噪音，成批出现才判隐写。
+- **hook 有意不感知隐形码** — PostToolUse hook 挂在每一次工具输出上，emoji 密集的文本不可避免，误报会骚扰每个会话；不可见字符交给 CLI/skill 按需检测。
+
 ## Development 开发
 
 ```bash
-python tests/test_garbled.py   # 便携版内嵌脚本（从 SKILL.md 提取）
+python tests/test_garbled.py   # 便携版脚本（scripts/garbled_portable.py）
 python tests/test_hook.py      # hook 命中/防误报
-python tests/test_cli.py       # 完整版 CLI（11 类型 demo / 文件 / --check / --json）
+python tests/test_cli.py       # 完整版 CLI（12 类型 demo / 文件 / --check / --json）
 ./install.sh                   # 部署到 ~/.claude（修改后同步）
 ```
 
