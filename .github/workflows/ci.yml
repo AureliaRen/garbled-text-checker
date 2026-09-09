@@ -46,7 +46,7 @@ jobs:
                              stdout=f, check=True)
           with open(out, encoding="utf-8") as f:
               d = json.load(f)
-          assert len(d) == 11, d
+          assert len(d) == 12, d
           print("demo OK:", len(d), "types")
 
       - name: Verify --check exit code
