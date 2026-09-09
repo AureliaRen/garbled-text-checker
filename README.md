@@ -44,13 +44,11 @@ python scripts/garbled_fix.py -f 乱码.txt --json             # JSON 输出
 python scripts/garbled_fix.py --demo                         # 生成 11 种类型演示样本
 ```
 
-Portable embedded script (no files needed — copy from `SKILL.md`):
+Portable single-file script (`scripts/garbled_portable.py`, six classic types; the argument is a file path, text can be piped in):
 
 ```bash
-python - <<'PY'
-import re, sys
-# ...（见 SKILL.md「检测与修复」章节，detect/fix 函数）
-PY
+python -X utf8 scripts/garbled_portable.py 乱码样本.txt
+printf '%s' "鑿辨浚瑕佸ソ濼濂藉彛涔犱範" | python -X utf8 scripts/garbled_portable.py
 ```
 
 ## Claude Code Skill Installation 安装为 Claude Code skill
@@ -59,7 +57,7 @@ PY
 ./install.sh
 ```
 
-This copies `SKILL.md` + `scripts/garbled_fix.py` into `~/.claude/skills/garbled-text-checker/`, the hook into `~/.claude/hooks/`, and idempotently registers the `PostToolUse` hook in `~/.claude/settings.json`. Afterwards:
+This copies `SKILL.md` + the `scripts/` files (full CLI + portable) into `~/.claude/skills/garbled-text-checker/`, the hook into `~/.claude/hooks/`, and idempotently registers the `PostToolUse` hook in `~/.claude/settings.json`. Afterwards:
 
 - 遇到乱码/编码报错时自动调用该 skill（CLAUDE.md 规则 + hook 双保险）
 - hook 检测到工具输出含编码报错（`UnicodeEncodeError`、`'gbk' codec can't` 等）或乱码特征时，自动注入提醒

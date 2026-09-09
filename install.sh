@@ -15,8 +15,9 @@ mkdir -p "$SKILLS_DIR/scripts" "$HOOKS_DIR"
 echo "==> 复制 SKILL.md"
 cp "$PROJ/SKILL.md" "$SKILLS_DIR/SKILL.md"
 
-echo "==> 复制 scripts/（完整版 CLI）"
+echo "==> 复制 scripts/（完整版 CLI + 便携版）"
 cp "$PROJ/scripts/garbled_fix.py" "$SKILLS_DIR/scripts/garbled_fix.py"
+cp "$PROJ/scripts/garbled_portable.py" "$SKILLS_DIR/scripts/garbled_portable.py"
 
 echo "==> 复制 hook 脚本"
 cp "$PROJ/hooks/check-garbled.py" "$HOOKS_DIR/check-garbled.py"

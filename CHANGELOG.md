@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-09-09
+
+### Changed
+- SKILL.md 不再内嵌便携脚本：提取为 `scripts/garbled_portable.py`，skill 触发时的加载体积约 -60%（脚本内容不进模型上下文，只读运行输出）
+- description 增补触发信号（UnicodeEncodeError / 'gbk' codec / 锟斤拷 / 重音字母等），脱离用户侧全局配置也能正确触发
+- install.sh 同步部署便携版；hook 提示文案与 README 用法同步更新
+- 回归测试改为直接加载 `scripts/garbled_portable.py`（不再从 SKILL.md 提取）
+
 ## [1.1.0] - 2026-08-15
 
 ### Added

@@ -1,22 +1,20 @@
 # -*- coding: utf-8 -*-
-"""garbled-text-checker skill 内嵌脚本回归测试。
+"""garbled-text-checker skill 便携版脚本回归测试。
 
 运行: python tests/test_garbled.py   （或 python -m unittest tests.test_garbled）
 """
-import re
 import sys
 import unittest
 from pathlib import Path
 
 PROJ = Path(__file__).resolve().parent.parent
-SKILL_MD = PROJ / "SKILL.md"
+PORTABLE = PROJ / "scripts" / "garbled_portable.py"
 
-# 从 SKILL.md 提取内嵌脚本并加载 detect/fix
-md = SKILL_MD.read_text(encoding="utf-8")
-m = re.search(r"python - <<'PY'\n(.*?)\nPY", md, re.S)
-assert m, "SKILL.md 中未找到内嵌脚本"
-NS = {"__name__": "__not_main__"}  # 阻止内嵌脚本的主执行代码在 import 时运行
-exec(m.group(1), NS)
+# 加载便携版脚本并取出 detect/fix
+src = PORTABLE.read_text(encoding="utf-8")
+assert "def detect" in src and "def fix" in src, "便携版脚本缺少 detect/fix"
+NS = {"__name__": "__not_main__"}  # 阻止脚本的主执行代码在加载时运行
+exec(compile(src, str(PORTABLE), "exec"), NS)
 detect, fix = NS["detect"], NS["fix"]
 
 ORIG = "好好学习天天向上"

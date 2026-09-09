@@ -85,7 +85,7 @@ def main():
             "hookEventName": "PostToolUse",
             "additionalContext": (
                 f"[乱码检测] 工具输出疑似{kind}。请调用 garbled-text-checker skill："
-                "先判定乱码类型，再用 scripts/garbled_fix.py（或 SKILL.md 内嵌脚本）反向还原；"
+                "先判定乱码类型，再用 scripts/garbled_fix.py（或 scripts/garbled_portable.py）反向还原；"
                 "若是编码报错，先修正编码设置，再按该 skill 的预防规则避免复发。"
             ),
         }
