@@ -40,8 +40,10 @@ class TestCLIBasic(unittest.TestCase):
         self.assertIn("正常", out)
 
     def test_version(self):
+        """--version 输出符合语义化版本格式（不写死具体版本号）"""
+        import re
         _, out = run_cli("--version")
-        self.assertIn("1.3.0", out)
+        self.assertRegex(out, r"garbled_fix \d+\.\d+\.\d+")
 
     def test_no_args_help(self):
         """无参数应显示帮助并 exit 2"""

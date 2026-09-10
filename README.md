@@ -1,14 +1,14 @@
 # Garbled Text Checker 乱码检测与修复
 
-> Detect and fix garbled text (mojibake) — 12 garbled-text types, BFS reverse-decoding repair, and a Claude Code skill + auto-detection hook.
+> Detect and fix garbled text (mojibake) — 13 garbled-text types, BFS reverse-decoding repair, LaTeX formula flattening, and a Claude Code skill + auto-detection hook.
 
 [![CI](https://github.com/AureliaRen/garbled-text-checker/actions/workflows/ci.yml/badge.svg)](https://github.com/AureliaRen/garbled-text-checker/actions/workflows/ci.yml)
 
-Identify and repair garbled text caused by encoding errors: the 6 classic Chinese mojibake types (**古文码 / 口字码 / 符号码 / 拼音码 / 问句码 / 锟拷码**) plus 6 extended types (HTML double-escape / lone surrogates / cp1252 misread / UTF-16 misread / C1 control characters / invisible Unicode). Ships as a standalone CLI, a portable script, and a Claude Code skill with an automatic PostToolUse hook.
+Identify and repair garbled text caused by encoding errors: the 6 classic Chinese mojibake types (**古文码 / 口字码 / 符号码 / 拼音码 / 问句码 / 锟拷码**) plus 7 extended types (HTML double-escape / lone surrogates / cp1252 misread / UTF-16 misread / C1 control characters / invisible Unicode / raw LaTeX formula residue). Ships as a standalone CLI, a portable script, a LaTeX formula flattener, and a Claude Code skill with an automatic PostToolUse hook.
 
 ## Features 功能
 
-- **12 种乱码类型检测**（含隐形码：不可见 Unicode）(12 type detection incl. invisible unicode)
+- **13 种乱码类型检测**（含隐形码与公式码）(13 type detection incl. invisible Unicode & LaTeX residue)
 
   | Classic 经典 | Cause 成因 |
   |---|---|
@@ -26,6 +26,7 @@ Identify and repair garbled text caused by encoding errors: the 6 classic Chines
   | cp1252 misread | Windows-1252 decoding of UTF-8 bytes |
   | UTF-16 misread | UTF-16LE/BE bytes read as latin-1 |
   | C1 control chars | U+0080-U+009F byte-stuffing residue |
+  | Raw LaTeX residue 公式码 | Unrendered `$$…$$` / `\frac{}{}` / `10^{23}` markers leaked into terminal output |
 
 - **BFS 多轮反向还原** (BFS reverse-decoding repair): tries `4 encodings × 7 decodings` up to 4 rounds, scores candidates by GBK level-1 Han character ratio, returns the best clean result. Honest about unrecoverable input (U+FFFD means bytes are gone — it says so instead of fabricating).
 - **完整 CLI**: multiple files, recursive directory scan, `--json` machine-readable output, `--check` exit-code mode (CI-friendly), `--demo` sample generator.
@@ -51,13 +52,21 @@ python -X utf8 scripts/garbled_portable.py 乱码样本.txt
 printf '%s' "鑿辨浚瑕佸ソ濼濂藉彛涔犱範" | python -X utf8 scripts/garbled_portable.py
 ```
 
+LaTeX formula flattener (`scripts/latex_to_text.py`, un-rendered LaTeX in terminal output → readable plain text; text arg / `-f` file / pipe, plus `--check` and `--demo`):
+
+```bash
+python -X utf8 scripts/latex_to_text.py '$$pV = \frac{m}{M}RT \quad\Leftrightarrow\quad pV = NkT$$'
+# → pV = m/M RT ⇔ pV = NkT
+python -X utf8 scripts/latex_to_text.py -f 笔记.md --check    # 有 LaTeX 残留 exit 1
+```
+
 ## Claude Code Skill Installation 安装为 Claude Code skill
 
 ```bash
 ./install.sh
 ```
 
-This copies `SKILL.md` + the `scripts/` files (full CLI + portable) into `~/.claude/skills/garbled-text-checker/`, the hook into `~/.claude/hooks/`, and idempotently registers the `PostToolUse` hook in `~/.claude/settings.json`. Afterwards:
+This copies `SKILL.md` + the `scripts/` files (full CLI + portable + formula flattener) into `~/.claude/skills/garbled-text-checker/`, the hook into `~/.claude/hooks/`, and idempotently registers the `PostToolUse` hook in `~/.claude/settings.json`. Afterwards:
 
 - 遇到乱码/编码报错时自动调用该 skill（CLAUDE.md 规则 + hook 双保险）
 - hook 检测到工具输出含编码报错（`UnicodeEncodeError`、`'gbk' codec can't` 等）或乱码特征时，自动注入提醒
@@ -74,6 +83,7 @@ This copies `SKILL.md` + the `scripts/` files (full CLI + portable) into `~/.cla
 - **SKILL.md 不内嵌脚本** — 脚本内容不进模型上下文，模型只读运行输出。便携版独立为 `scripts/garbled_portable.py` 后，skill 触发时的加载体积约 -60%。
 - **隐形码防误报三规则** — 文件头 BOM、emoji ZWJ 序列（👨‍👩‍👦）、emoji 后的 VS16（❤️）都是正常文本，不判；游离变体选择符 <3 个视为排版噪音，成批出现才判隐写。
 - **hook 有意不感知隐形码** — PostToolUse hook 挂在每一次工具输出上，emoji 密集的文本不可避免，误报会骚扰每个会话；不可见字符交给 CLI/skill 按需检测。
+- **公式码走独立脚本而非 `detect()`** — 编码乱码是"字节被误读"，修复动作是反向还原；公式码是"标记未渲染"，修复动作是结构拉平+Unicode 替换，两者机理不同。且合法 LaTeX 文档（论文/讲义）大量含 `$$`，并入 `detect()`/hook 必然误报。输出侧预防（终端/聊天公式一律纯文本记法）比事后修复更重要。
 
 ## Development 开发
 
@@ -81,6 +91,7 @@ This copies `SKILL.md` + the `scripts/` files (full CLI + portable) into `~/.cla
 python tests/test_garbled.py   # 便携版脚本（scripts/garbled_portable.py）
 python tests/test_hook.py      # hook 命中/防误报
 python tests/test_cli.py       # 完整版 CLI（12 类型 demo / 文件 / --check / --json）
+python tests/test_latex.py     # 公式码拉平（scripts/latex_to_text.py）
 ./install.sh                   # 部署到 ~/.claude（修改后同步）
 ```
 
@@ -88,7 +99,7 @@ CI (GitHub Actions) runs all tests on Ubuntu / Windows / macOS.
 
 ## Roadmap 路线图
 
-- [x] 12 种类型检测与修复（含隐形码）
+- [x] 13 种类型检测与修复（含隐形码、公式码）
 - [x] 完整 CLI（批量/JSON/退出码）
 - [x] Claude Code skill + hook
 - [ ] ftfy 风格的高级修复（lone marks、ligatures、crashed "s"）

@@ -34,6 +34,7 @@ jobs:
           python tests/test_garbled.py
           python tests/test_hook.py
           python tests/test_cli.py
+          python tests/test_latex.py
 
       # shell: python + tempfile：/tmp 是 POSIX 路径，Windows runner 上不存在
       - name: Verify CLI demo (smoke)
